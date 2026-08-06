@@ -83,6 +83,13 @@ Selesai. Yang masih harus dikerjakan manusia:
        $HERMES -p $ORCH gateway install
        $HERMES -p $ORCH gateway start
 
-  4. Periksa MCP tiap profile benar-benar tersambung:
-       $HERMES -p <profile> doctor
+  4. Periksa MCP tiap profile benar-benar tersambung dan melihat tool yang
+     benar. Ini pemeriksaan terpenting: kalau jumlah tool-nya tidak sesuai
+     remit departemen, batas wewenangnya sedang tidak berlaku.
+       $HERMES -p <profile> mcp test alta
+
+     Jumlah yang diharapkan (dengan agent_tool_permissions terpasang):
+       orchestrator 126 (baca-saja)   verifying_readiness 43   recruitment 43
+       legal 40   sales 23   customer_service 21   marketing 19
+       finance 18   it 18
 EOF

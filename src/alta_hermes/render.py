@@ -125,23 +125,76 @@ def render_config(
     return config
 
 
-def _mcp_entry(agent: Agent, policy: dict[str, Any], settings: Settings) -> dict[str, Any]:
-    args = list(settings.mcp_args)
-    if settings.backend_dir and settings.mcp_command == "uv":
-        # as_posix(): render bisa dijalankan dari Windows saat pengembangan,
-        # tetapi yang membaca hasilnya selalu Hermes di VPS Linux.
-        args = ["--directory", settings.backend_dir.as_posix(), *args]
+def render_mcp_launcher(agent: Agent, policy: dict[str, Any], settings: Settings) -> str:
+    """Skrip yang menyalakan proses MCP departemen ini.
 
-    env = {
-        "ALTA_AGENT": agent.code,
-        # Nilainya diambil dari .env profile, tidak pernah ditulis ke config.yaml.
-        "ALTA_DATABASE_URL": "${ALTA_DATABASE_URL}",
-    }
-    if policy["read_only"]:
-        env["ALTA_READ_ONLY"] = "true"
+    Ada karena `${ALTA_DATABASE_URL}` di `config.yaml` tidak bisa diandalkan:
+    pada uji 6 Agustus 2026, Hermes tidak mengekspor `.env` profile ke
+    substitusi itu, sehingga server MCP menerima placeholder mentah lalu mati.
+    Menuliskan URL-nya langsung ke `config.yaml` bukan pilihan — di dalamnya ada
+    password database.
+
+    Peluncur ini membaca `.env` milik profile-nya sendiri, jadi rahasianya tetap
+    di satu tempat (`.env`, chmod 600) dan tidak pernah masuk berkas yang
+    di-render atau di-commit.
+    """
+    target = settings.mcp_command
+    if settings.backend_dir and Path(target).name.startswith("uv"):
+        target = f'{target} --directory "{settings.backend_dir.as_posix()}" ' + " ".join(
+            settings.mcp_args
+        )
+    elif settings.mcp_args:
+        target = target + " " + " ".join(settings.mcp_args)
+    else:
+        target = f'"{target}"'
+
+    read_only = 'export ALTA_READ_ONLY=true\n' if policy["read_only"] else ""
+    return f"""#!/usr/bin/env bash
+# Dihasilkan {GENERATED_MARK} — jangan disunting; jalankan ulang render.
+#
+# Menyalakan proses MCP departemen {agent.code}. Rahasianya dibaca dari .env
+# milik profile ini, bukan dari config.yaml — di config.yaml ia akan ikut
+# ter-commit atau terbaca siapa pun yang membuka berkasnya.
+set -euo pipefail
+
+PROFILE_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+if [ -f "$PROFILE_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$PROFILE_DIR/.env"
+  set +a
+fi
+
+export ALTA_AGENT={agent.code}
+{read_only}
+# Sembilan proses MCP berbagi satu Postgres. Bawaan ALTA_POOL_MAX=8 dikalikan
+# sembilan sudah melewati max_connections bawaan (100) sebelum REST API dihitung.
+export ALTA_POOL_MAX="${{ALTA_POOL_MAX:-4}}"
+
+exec {target}
+"""
+
+
+def _mcp_entry(agent: Agent, policy: dict[str, Any], settings: Settings) -> dict[str, Any]:
+    if settings.mcp_command_explicit:
+        # Operator memaksa perintahnya sendiri (mis. .exe untuk uji di Windows,
+        # di mana peluncur .sh tidak bisa dijalankan). Di jalur ini `env` di
+        # bawah adalah SATU-SATUNYA lingkungan yang diterima subproses —
+        # terbukti 6 Agustus 2026: Hermes tidak mewariskan lingkungan induknya,
+        # sehingga tanpa baris ALTA_DATABASE_URL server MCP mati saat start.
+        # Nilainya tetap placeholder; Hermes menggantinya dari lingkungannya
+        # sendiri, jadi password tidak pernah tertulis di config.yaml.
+        command, args = settings.mcp_command, list(settings.mcp_args)
+        env = {"ALTA_AGENT": agent.code, "ALTA_DATABASE_URL": "${ALTA_DATABASE_URL}"}
+        if policy["read_only"]:
+            env["ALTA_READ_ONLY"] = "true"
+    else:
+        command = (settings.profile_dir(agent.profile_name) / "mcp-launch.sh").as_posix()
+        args = []
+        env = {}
 
     return {
-        "command": settings.mcp_command,
+        "command": command,
         "args": args,
         "env": env,
         "timeout": 120,
@@ -266,7 +319,7 @@ def render_profile(
         if isinstance(loaded, dict):
             existing = loaded
 
-    return [
+    files = [
         RenderedFile(profile_dir / "SOUL.md", render_soul(state, agent, guardrails)),
         RenderedFile(
             existing_path, dump_config(render_config(existing, agent, policy, settings))
@@ -277,6 +330,15 @@ def render_profile(
             executable=True,
         ),
     ]
+    if not settings.mcp_command_explicit:
+        files.append(
+            RenderedFile(
+                profile_dir / "mcp-launch.sh",
+                render_mcp_launcher(agent, policy, settings),
+                executable=True,
+            )
+        )
+    return files
 
 
 def apply(files: list[RenderedFile], *, dry_run: bool) -> list[str]:

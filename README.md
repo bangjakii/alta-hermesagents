@@ -186,6 +186,7 @@ Sesudah itu tiga hal masih dikerjakan manusia, dan memang harus:
 ## Struktur
 
 ```
+<profile>/mcp-launch.sh   dirender: menyalakan proses MCP dept, membaca .env profile
 directives/<dept>.md      teks arahan; heading ## menjadi baris agent_directives
 agents.yaml               model & provider tiap dept  -> tabel agents
 schedules.yaml            jadwal tiap dept            -> tabel agent_schedules
@@ -213,14 +214,46 @@ catatan untuk pembaca manusia.
 
 ## Status
 
-Diuji: 44 uji lolos — parsing directive, perakitan SOUL, penggabungan
-`config.yaml`, pengutipan `cron.sh`, dan kedua hook guardrail (yang berbahaya
-diblokir, yang wajar tidak).
+**Lingkaran penuh sudah dijalankan** terhadap PostgreSQL 17.4 lokal berisi skema
+ALTA lengkap (71 tabel, 8 view) dan Hermes 0.17 sungguhan, 6 Agustus 2026:
 
-Belum diuji terhadap sistem nyata: **`sync` ke Postgres** dan **`render` yang
-dijalankan Hermes sungguhan**. Mesin pengembangan tidak punya keduanya, jadi
-seluruh lapisan database baru terbukti saat dijalankan di VPS. Jalankan
-`alta-hermes sync --dry-run` lebih dulu di sana sebelum menulis apa pun.
+| Yang diuji | Hasil |
+|---|---|
+| `sync` repo → database | 95 perubahan; 63 directive + 23 jadwal + 9 baris `agents` |
+| Jejak audit `sync` | tercatat `human`/`founder` beserta alasannya |
+| `sync` kedua kali | "database sudah sesuai repo" — idempoten |
+| Round-trip berkas → DB → SOUL | identik byte per byte, kecuali label sumber di header |
+| Pendaftaran tool MCP per dept | orchestrator 126 (baca-saja), V&R 43, legal 40, sales 23, CS 21, finance/IT 18 |
+| Pencabutan `agent_tool_permissions` | sales 31→23, marketing 24→19 — pemangkasan migration 049/055 tegak |
+| `cron.sh` terhadap CLI Hermes | job terdaftar dengan nama & jadwal yang benar |
+| `mcp-launch.sh` | membaca `.env` profile, menyalakan MCP tanpa rahasia di berkas lain |
+| Hermes → MCP ALTA | **tersambung, 18 tool ditemukan** untuk profile `alta-it` |
+| 46 uji unit | lolos |
+
+Tiga hal yang hanya ketahuan karena diuji, dan ketiganya mengubah desain:
+
+1. **`uv run alta-mcp` tidak layak jadi peluncur.** Ia menyelaraskan ulang venv
+   terhadap `pyproject.toml` setiap start — pada uji ini ia mencopot 10 paket,
+   memasang 15, dan menaikkan `mcp` ke versi mayor yang tidak lagi punya
+   `mcp.server.fastmcp`, sehingga server mati saat start. Default sekarang
+   memanggil entry point venv langsung.
+2. **Hermes tidak mewariskan lingkungan induk ke subproses MCP.** Hanya `env`
+   yang dideklarasikan di `config.yaml` yang sampai — dan `${VAR}` di sana tidak
+   terisi dari `.env` profile pada semua jalur. Karena password tidak boleh
+   ditulis ke `config.yaml`, boot script merender `mcp-launch.sh` per profile
+   yang membaca `.env`-nya sendiri.
+3. **`hermes cron create` tidak punya flag `--model`/`--provider`.** Job yang
+   tidak dipin menyimpan snapshot default global dan **fail-closed** bila
+   default itu berubah. Untuk memin, pakai `cronjob action=update job_id=…
+   provider=… model=…` dari dalam sesi; `cron.sh` sudah mendeteksi ketiadaan
+   flag itu dan memberi peringatan alih-alih gagal diam-diam.
+
+Catatan penting soal `backend/pyproject.toml` (repo `alta-database`, bukan repo
+ini): `mcp>=1.2.0` tanpa batas atas. Resolusi baru mana pun akan menarik versi
+mayor yang tidak kompatibel. Sebaiknya dipatok `mcp>=1.2,<2` di sana.
+
+Belum diuji: gateway Telegram orchestrator dan sesi agent sungguhan — keduanya
+menuntut kunci provider. Yang terbukti berhenti tepat sebelum inferensi pertama.
 
 Belum dibangun:
 

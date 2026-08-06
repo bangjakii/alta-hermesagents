@@ -59,22 +59,36 @@ Keadaan mesin pengembangan Windows ini (diperiksa 6 Agustus 2026):
 
 | | |
 |---|---|
-| Hermes | **ada** — `%LOCALAPPDATA%\hermes`, 7 profile `ks-*` sudah jalan |
+| Hermes | **ada** — `%LOCALAPPDATA%\hermes`, 7 profile `ks-*` + profile uji `alta-it` |
 | `uv` | **ada** — `%LOCALAPPDATA%\hermes\bin\uv.exe` |
-| PostgreSQL | **tidak ada** — tidak ada `psql`, layanan, maupun port 5432 |
+| PostgreSQL | **ada, portabel** — 17.4 di port **55432**, basis data `alta_test` |
 | Docker / WSL | **tidak ada** |
 
-Artinya:
+Postgres-nya biner portabel yang dipasang sesi sebelumnya di bawah
+`%TEMP%\claude\…-alta-database\d17b66a9-…\scratchpad\pg`, dengan data di
+`…\scratchpad\pgdata`. **Ia ada di direktori sementara** — kalau suatu saat
+hilang, itu bukan kerusakan, dan basis datanya dibangun ulang dengan
+menjalankan migration `alta-database` dari awal. Isinya data uji, bukan PII.
 
-- Jalur `--from files` bisa diuji sepenuhnya; **jalur database tidak**, karena
-  tidak ada Postgres untuk disambungi.
-- Jangan menulis kode yang mengandaikan bisa dicoba ke DB di sini — tulis
-  supaya bisa diperiksa statis, lalu tandai jelas apa yang belum terbukti.
+Perintah uji lingkaran penuh dari repo ini:
+
+```bash
+export ALTA_DATABASE_URL="postgresql://postgres@localhost:55432/alta_test"
+export HERMES_PROFILES_ROOT="/c/Users/user/AppData/Local/hermes/profiles"
+export ALTA_BACKEND_DIR="…/ALTA/alta-database/backend"
+# Windows tidak bisa mengeksekusi mcp-launch.sh, jadi tunjuk .exe-nya langsung:
+export ALTA_MCP_COMMAND="…/backend/.venv/Scripts/alta-mcp.exe"
+```
+
+Hal lain yang perlu diketahui:
+
 - Jalur berkas dirender dengan `as_posix()`: render boleh berjalan di Windows,
   tetapi yang membaca hasilnya selalu Linux di VPS.
-- Untuk mencoba di laptop, setel `HERMES_PROFILES_ROOT` ke
-  `%LOCALAPPDATA%\hermes\profiles` — bukan `~/.hermes/profiles`, karena
-  instalasi di sini memakai `HERMES_HOME` sendiri.
+- **Jangan menjalankan `uv run` di `alta-database/backend`.** Ia menyelaraskan
+  ulang venv dan menaikkan `mcp` ke versi mayor yang mematikan server MCP.
+  Pemulihannya: `uv pip install --python .venv/Scripts/python.exe "mcp<2" -e ".[dev]"`.
+- Hermes **tidak** mewariskan lingkungan induk ke subproses MCP — hanya `env` di
+  `config.yaml` yang sampai. Itulah alasan `mcp-launch.sh` ada.
 
 ## Menambah atau mengubah arahan departemen
 

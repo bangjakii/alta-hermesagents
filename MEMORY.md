@@ -51,14 +51,22 @@ KS (`ks-finance`, `ks-hr`, `ks-it`, `ks-legal`, `ks-marketing`, `ks-ops`,
 memang dirancang menaungi banyak profile, dan tiap profile punya `.env`,
 memori, sesi, serta kredensial sendiri.
 
-**PostgreSQL, Docker, dan WSL tidak ada** di mesin ini. Karena itu:
+**PostgreSQL 17.4 juga ada**, sebagai biner portabel di direktori sementara
+sesi lama (`%TEMP%\claude\…-alta-database\d17b66a9-…\scratchpad\pg`), berjalan
+di **port 55432** dengan basis data `alta_test` berisi skema ALTA lengkap.
+Karena letaknya di `%TEMP%`, anggap ia **fana**: kalau hilang, bangun ulang
+dengan menjalankan migration dari awal. Isinya data uji, bukan PII.
 
-- Jalur `--from files` bisa diuji penuh; **jalur database belum pernah
-  dijalankan sungguhan** — `sync` dan `render --from database` baru terbukti
-  setelah ada Postgres (di VPS, atau dipasang lokal).
-- `pgvector` juga belum terverifikasi di sini (tidak ada binary Windows resmi).
+**Docker dan WSL tidak ada.**
+
 - `HERMES_PROFILES_ROOT` untuk percobaan lokal adalah
   `%LOCALAPPDATA%\hermes\profiles`, bukan `~/.hermes/profiles`.
+- Windows tidak bisa mengeksekusi `mcp-launch.sh`, jadi untuk uji lokal setel
+  `ALTA_MCP_COMMAND` ke `backend/.venv/Scripts/alta-mcp.exe`.
+- `pgvector` tetap belum terverifikasi (tidak ada binary Windows resmi); salinan
+  uji memakai `real[]` sebagai ganti `vector(1024)`.
+- **Jangan menjalankan `uv run` di `alta-database/backend`** — ia menyelaraskan
+  ulang venv dan menaikkan `mcp` ke versi mayor yang mematikan server MCP.
 
 ## Yang belum ada, dan menahan jalur kritis
 

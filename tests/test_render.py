@@ -7,6 +7,7 @@ dirusak, orkestrator berjalan baca-saja, dan satu pintu tidak bocor.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,13 @@ import yaml
 
 from alta_hermes.config import Settings
 from alta_hermes.models import Agent
-from alta_hermes.render import dump_config, render_config, render_cron, render_soul
+from alta_hermes.render import (
+    dump_config,
+    render_config,
+    render_cron,
+    render_mcp_launcher,
+    render_soul,
+)
 from alta_hermes.sources import SourceError, load_from_files, load_policy, parse_directives
 
 REPO = Path(__file__).resolve().parents[1]
@@ -33,13 +40,14 @@ def policies():
 @pytest.fixture(scope="module")
 def settings(tmp_path_factory):
     root = tmp_path_factory.mktemp("profiles")
+    backend = Path("/opt/alta/alta-database/backend")
     return Settings(
         repo_root=REPO,
         profiles_root=root,
         database_url=None,
-        backend_dir=Path("/opt/alta/alta-database/backend"),
-        mcp_command="uv",
-        mcp_args=("run", "alta-mcp"),
+        backend_dir=backend,
+        mcp_command=(backend / ".venv" / "bin" / "alta-mcp").as_posix(),
+        mcp_args=(),
         profile_prefix="alta-",
     )
 
@@ -124,21 +132,58 @@ def test_kunci_milik_hermes_dipertahankan(state, policies, settings):
     assert config["model"]["api_mode"] == "chat_completions"
 
 
-def test_orchestrator_dijalankan_baca_saja(state, policies, settings):
-    config = render_config({}, state.agents["orchestrator"], policies["orchestrator"], settings)
-    env = config["mcp_servers"]["alta"]["env"]
-    assert env["ALTA_READ_ONLY"] == "true"
-    assert env["ALTA_AGENT"] == "orchestrator"
+def test_perintah_paksa_membawa_departemen_lewat_env(state, policies, settings):
+    # Mode ini dipakai saat uji di Windows: peluncur .sh dilewati, jadi
+    # identitas departemen harus ikut lewat env agar batas wewenang tetap ada.
+    dipaksa = replace(settings, mcp_command="C:/x/alta-mcp.exe", mcp_command_explicit=True)
 
+    orch = render_config({}, state.agents["orchestrator"], policies["orchestrator"], dipaksa)
+    rec = render_config({}, state.agents["recruitment"], policies["recruitment"], dipaksa)
 
-def test_departemen_lain_tidak_baca_saja(state, policies, settings):
-    config = render_config({}, state.agents["recruitment"], policies["recruitment"], settings)
-    assert "ALTA_READ_ONLY" not in config["mcp_servers"]["alta"]["env"]
+    assert orch["mcp_servers"]["alta"]["env"] == {
+        "ALTA_AGENT": "orchestrator",
+        "ALTA_DATABASE_URL": "${ALTA_DATABASE_URL}",
+        "ALTA_READ_ONLY": "true",
+    }
+    assert rec["mcp_servers"]["alta"]["env"] == {
+        "ALTA_AGENT": "recruitment",
+        "ALTA_DATABASE_URL": "${ALTA_DATABASE_URL}",
+    }
+    assert rec["mcp_servers"]["alta"]["command"] == "C:/x/alta-mcp.exe"
+    # Placeholder, bukan nilainya: password tetap tidak masuk config.yaml.
+    assert "postgres" not in dump_config(rec)
 
 
 def test_password_database_tidak_pernah_masuk_config(state, policies, settings):
     config = render_config({}, state.agents["finance"], policies["finance"], settings)
-    assert config["mcp_servers"]["alta"]["env"]["ALTA_DATABASE_URL"] == "${ALTA_DATABASE_URL}"
+    dumped = dump_config(config)
+    assert "ALTA_DATABASE_URL" not in dumped
+    assert "postgres" not in dumped
+    # Peluncurlah yang membaca .env profile, bukan config.yaml.
+    assert config["mcp_servers"]["alta"]["command"].endswith("mcp-launch.sh")
+
+
+def test_peluncur_membaca_env_profile_dan_menyetel_departemen(state, policies, settings):
+    script = render_mcp_launcher(state.agents["finance"], policies["finance"], settings)
+    assert 'ALTA_AGENT=finance' in script
+    assert '. "$PROFILE_DIR/.env"' in script
+    assert "ALTA_READ_ONLY" not in script
+    # Sembilan proses MCP berbagi satu Postgres; bawaan 8 melewati max_connections.
+    assert "ALTA_POOL_MAX" in script
+
+
+def test_peluncur_orchestrator_baca_saja(state, policies, settings):
+    script = render_mcp_launcher(
+        state.agents["orchestrator"], policies["orchestrator"], settings
+    )
+    assert "export ALTA_READ_ONLY=true" in script
+
+
+def test_perintah_mcp_bawaan_bukan_uv_run(settings):
+    # `uv run` menyelaraskan ulang venv tiap start dan pernah menaikkan `mcp`
+    # ke versi mayor yang mematikan server. Lihat _default_mcp_command().
+    assert "uv" not in Path(settings.mcp_command).name
+    assert settings.mcp_command.endswith(".venv/bin/alta-mcp")
 
 
 def test_toolset_dipersempit_ke_daftar_departemen(state, policies, settings):
