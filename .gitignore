@@ -1,0 +1,19 @@
+# Rahasia — tidak pernah masuk repo. Semuanya di Infisical.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Hasil render (runtime Hermes, bukan sumber)
+build/
+render-out/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/

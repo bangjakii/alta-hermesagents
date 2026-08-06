@@ -1,0 +1,249 @@
+# =====================================================================
+# Desired state jadwal tiap departemen  ->  tabel `agent_schedules`
+# =====================================================================
+# `alta-hermes sync` mendorongnya ke DB; `alta-hermes render` menghasilkan
+# `cron.sh` per profile yang mendaftarkannya ke cron Hermes.
+#
+# INILAH MOTOR SISTEMNYA. Departemen tidak punya kanal ke manusia dan tidak
+# dipanggil siapa pun — mereka bangun karena jadwal, membaca antreannya
+# sendiri lewat `list_my_tasks`, mengerjakannya, lalu tidur lagi.
+# Orchestrator hanya menaruh pekerjaan di antrean itu lewat `assign_task`;
+# ia tidak memanggil departemen langsung. Pemisahan ini disengaja: satu
+# proses mati tidak menghentikan yang lain, dan setiap pekerjaan
+# meninggalkan baris yang bisa dilihat founder.
+#
+# Zona waktu mengikuti jam VPS — jalankan `timedatectl set-timezone
+# Asia/Jakarta` sebelum menyalakan cron, kalau tidak "briefing pagi" tiba
+# tengah malam.
+#
+# deliver_to: 'none' untuk pekerjaan yang hasilnya masuk database (hampir
+# semuanya). Hanya laporan yang memang untuk founder memakai
+# 'telegram:founder', dan itu hanya boleh dipakai orchestrator —
+# `alta-hermes doctor` menolak bila departemen lain memakainya.
+# =====================================================================
+
+orchestrator:
+  - name: briefing-pagi
+    schedule: "0 7 * * *"
+    deliver_to: telegram:founder
+    prompt: >
+      Susun briefing pagi untuk founder. Jalankan operational_dashboard untuk
+      melihat bottleneck pipeline, beban tiap departemen, antrean founder, dan
+      serah terima mitra yang basi. Laporkan dengan format Subjek -> Isi ->
+      Tindakan yang Diperlukan, maksimal 15 baris, dengan angka bukan kesan.
+      Bila tidak ada yang berubah dari kemarin dan tidak ada yang menunggu
+      founder, jawab persis [SILENT].
+
+  - name: sapu-bottleneck
+    schedule: "0 10,14,17 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan operational_dashboard. Untuk tiap penumpukan yang jelas
+      pemiliknya, buat pekerjaan lewat assign_task ke departemen yang
+      bersangkutan — satu task per penumpukan, instruksinya cukup lengkap
+      untuk dikerjakan tanpa bertanya balik. Cek list_tasks lebih dulu supaya
+      tidak membuat duplikat pekerjaan yang masih terbuka. Jangan mengerjakan
+      sendiri pekerjaan departemen.
+
+  - name: antrean-founder
+    schedule: "0 16 * * *"
+    deliver_to: telegram:founder
+    prompt: >
+      Baca antrean founder lewat operational_dashboard. Ringkas apa saja yang
+      menunggu keputusan founder, urut dari yang paling lama menunggu, dengan
+      dampak menunda tiap butir. Gabungkan eskalasi bertema sama menjadi satu
+      butir. Bila antrean kosong, jawab persis [SILENT].
+
+recruitment:
+  - name: ambil-task
+    schedule: "*/15 * * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks. Kerjakan dari prioritas tertinggi: start_task
+      sebelum mulai, complete_task dengan hasil terbaca mesin sesudah selesai.
+      Bila terhalang sesuatu di luar kendali Anda, block_task dengan
+      penyebabnya; bila memang tidak bisa dikerjakan, fail_task dengan
+      alasannya. Jangan meninggalkan task menggantung tanpa status.
+
+  - name: antrean-screening
+    schedule: "0 8,13 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_screening_queue dan list_intake_queue. Lanjutkan sesi
+      screening yang tertunda, catat jawabannya lewat record_screening_answers,
+      lalu score_screening_session. Kandidat yang lolos disiapkan menuju
+      'ready' lewat set_candidate_readiness. Ingat batas Anda: tahap lamaran
+      hanya boleh dimajukan sampai employer_review.
+
+  - name: talent-pool-macet
+    schedule: "30 8 * * *"
+    deliver_to: none
+    prompt: >
+      Cari kandidat yang tertahan di Jalur A lebih dari 14 hari lewat
+      search_talent_pool dan list_intake_queue. Tentukan penyebab tiap kasus —
+      screening belum dijawab, CV tidak lengkap, atau tidak memenuhi syarat
+      pasar mana pun — lalu tindak lanjuti. Jangan mendiskualifikasi siapa pun
+      sendiri: record_disqualification hanya untuk pelanggaran kontrak atau
+      hukum yang sudah terbukti, sisanya eskalasi.
+
+verifying_readiness:
+  - name: ambil-task
+    schedule: "*/15 * * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks dan kerjakan sesuai prioritas, dengan start_task
+      dan complete_task di tiap ujungnya. Bila keaslian sebuah dokumen
+      diragukan, jangan diputuskan sendiri — escalate_document_to_legal.
+
+  - name: antrean-verifikasi
+    schedule: "0 9,14 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_verification_queue. Verifikasi dokumen yang masuk dengan
+      verify_document. Untuk tiap kandidat yang sudah lewat employer_review,
+      jalankan check_candidate_documents — dokumen wajib yang belum verified
+      menahan medical, kontrak, dan visa sekaligus, jadi keterlambatan di sini
+      menahan seluruh rantai.
+
+  - name: mitra-tak-berkabar
+    schedule: "0 9 * * 1-5"
+    deliver_to: none
+    prompt: >
+      Jalankan list_handoffs. Untuk serah terima yang mitranya lama tidak
+      memberi kabar, minta kabar terbaru lalu catat dengan sync_handoff_status
+      supaya last_synced_at ikut segar. Bila sudah dua kali diminta tanpa
+      jawaban, raise_escalation dengan dedup_key bertema mitra tersebut.
+
+customer_service:
+  - name: ambil-task
+    schedule: "*/15 * * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
+      di tiap ujungnya.
+
+  - name: welfare-checkin
+    schedule: "0 9 * * 1"
+    deliver_to: none
+    prompt: >
+      Jalankan list_placements dan list_staffing_employees untuk mendapat
+      daftar pekerja AKTIF, lalu lakukan check-in kesejahteraan mingguan dan
+      catat tiap hasilnya dengan record_welfare_checkin. Tanda bahaya — gaji
+      tidak dibayar, paspor ditahan, jam kerja di luar kontrak, kekerasan —
+      bukan tiket biasa: open_support_ticket DAN raise_escalation dengan
+      severity critical seketika, jangan menunggu jadwal berikutnya.
+
+  - name: sla-tiket
+    schedule: "0 8,15 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_support_tickets. Selesaikan yang bisa diselesaikan dengan
+      resolve_support_ticket, rutekan sisanya lewat update_support_ticket ke
+      departemen yang tepat. Untuk keluhan berulang bertema sama, pakai
+      raise_escalation dengan dedup_key supaya melebur jadi satu kartu, bukan
+      menumpuk di meja founder.
+
+sales:
+  - name: ambil-task
+    schedule: "*/15 * * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
+      di tiap ujungnya.
+
+  - name: antrean-sales
+    schedule: "0 9 * * 1-5"
+    deliver_to: none
+    prompt: >
+      Jalankan list_sales_queue. Susul outreach yang belum dibalas lebih dari
+      lima hari kerja, maksimal dua susulan per kontak, dan catat tiap
+      pengiriman dengan record_outreach. Hormati suppression: kontak yang
+      sudah minta berhenti dihubungi tidak boleh disentuh lagi, apa pun
+      alasannya — bila diminta berhenti, add_to_suppression seketika. Prospek
+      yang menunjukkan minat serius diserahkan lewat hand_client_to_founder,
+      tidak Anda lanjutkan sendiri.
+
+legal:
+  - name: ambil-task
+    schedule: "*/30 * * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks. Task bertipe legal_review ditutup dengan vonis
+      terbaca mesin sesuai result_schema_key — task telaah tidak bisa ditutup
+      tanpa vonis, dan memang tidak boleh.
+
+  - name: dokumen-menunggu-telaah
+    schedule: "0 10 * * 1-5"
+    deliver_to: none
+    prompt: >
+      Jalankan list_client_agreements dan list_company_documents untuk
+      menemukan dokumen yang review_status-nya masih menunggu. Telaah menurut
+      dampak: perjanjian klien menahan pembukaan job order, perjanjian mitra
+      menahan serah terima, kontrak kerja menahan visa dan keberangkatan.
+      Catat hasilnya lewat review_client_agreement, review_partnership_agreement,
+      atau review_employment_contract.
+
+finance:
+  - name: ambil-task
+    schedule: "*/30 * * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
+      di tiap ujungnya.
+
+  - name: piutang-jatuh-tempo
+    schedule: "0 9 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_receivables. Tandai invoice yang jatuh tempo hari ini dan
+      yang sudah lewat. Siapkan bahan penagihannya, tetapi relasi klien
+      dipegang founder — kirimkan lewat send_agent_message ke orchestrator,
+      jangan menghubungi klien sendiri. Untuk tunggakan lewat 30 hari,
+      raise_escalation.
+
+  - name: bagi-hasil-siap-cair
+    schedule: "0 14 * * 1"
+    deliver_to: none
+    prompt: >
+      Jalankan list_settlements. Cari bagi hasil mitra yang invoicenya sudah
+      dibayar penuh tetapi bagian mitranya belum cair, lalu siapkan
+      pencairannya dengan mark_settlement_disbursed. Ingat "klien sudah bayar"
+      dan "bagian ALTA sudah masuk" adalah dua kejadian terpisah — jangan
+      mencampurnya dalam laporan.
+
+marketing:
+  - name: ambil-task
+    schedule: "0 */2 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
+      di tiap ujungnya.
+
+  - name: peringkat-seo
+    schedule: "0 8 * * 1"
+    deliver_to: none
+    prompt: >
+      Jalankan list_seo_keywords, lalu catat peringkat mingguan tiap kata
+      kunci dengan record_seo_ranking. Data ini append-only: jangan menyunting
+      pengukuran lama. Laporkan arah pergerakannya, bukan angka tunggal —
+      satu pengukuran peringkat tidak berarti apa-apa. Pisahkan kata kunci
+      audiens kandidat dari audiens klien, dan bahasa Indonesia dari Inggris.
+
+it:
+  - name: ambil-task
+    schedule: "0 */2 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
+      di tiap ujungnya.
+
+  - name: kesehatan-layanan
+    schedule: "0 7 * * *"
+    deliver_to: none
+    prompt: >
+      Jalankan list_services untuk layanan berstatus active: masih hidup?
+      ada yang mendekati kedaluwarsa (domain, sertifikat, langganan)? Untuk
+      layanan yang bermasalah, baca serves_agents pada list_repositories dan
+      registri layanan untuk menilai departemen mana yang terdampak SEBELUM
+      menyentuh apa pun, lalu laporkan dampaknya bersama temuannya. Insiden
+      keamanan dicatat lewat report_security_incident, bukan disimpan sendiri.

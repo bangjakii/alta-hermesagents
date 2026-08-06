@@ -1,0 +1,92 @@
+# =====================================================================
+# Wewenang tingkat runtime — SENGAJA di kode, bukan di database.
+# =====================================================================
+# Yang ada di sini menentukan apa yang bisa disentuh sebuah profile Hermes
+# di luar tool ALTA: shell, berkas, web, kanal pesan. Ia tidak diletakkan di
+# tabel mana pun karena satu salah klik di Admin Panel tidak boleh bisa
+# memberi departemen Marketing akses terminal.
+#
+# Izin tool ALTA sendiri (siapa boleh memanggil `create_placement`, dst)
+# TIDAK di sini — itu ditegakkan pendaftaran MCP Server per departemen
+# (ALTA_AGENT) plus tabel agent_tool_permissions yang hanya bisa
+# MENYEMPITKAN.
+#
+# Prinsip: beri yang paling sedikit. Menambah satu toolset harus punya
+# alasan yang bisa ditulis di kolom `alasan` di bawah.
+# =====================================================================
+
+defaults:
+  # Toolset dasar tiap departemen. `mcp-alta` lahir otomatis dari entri
+  # mcp_servers.alta di config.yaml yang dirender boot script.
+  toolsets: [mcp-alta, memory, todo, session_search]
+
+  # Tidak ada gateway. Departemen tidak punya kanal ke manusia — hanya
+  # Orchestrator yang punya. Mereka dijalankan cron dan menulis ke DB.
+  platforms: []
+
+  # Dimatikan di semua profile, apa pun toolset yang aktif.
+  disabled_toolsets: [browser, tts, computer_use, x_search, spotify, kanban]
+
+agents:
+
+  orchestrator:
+    alasan: >
+      Pemantau dan satu-satunya pintu ke founder. Punya cronjob (menjadwalkan
+      briefing & sapuan bottleneck) dan delegation (memecah pemantauan lintas
+      dept jadi bacaan paralel). TIDAK punya terminal/file: ia tidak
+      mengerjakan pekerjaan departemen, ia mendistribusikannya lewat tasks.
+    toolsets: [mcp-alta, memory, todo, session_search, cronjob, delegation]
+    platforms: [telegram]
+    # Perannya memantau, bukan memutuskan kandidat. Tanpa ini batas antar
+    # departemen luntur karena orkestrator bisa mengerjakan semuanya sendiri.
+    read_only: true
+
+  recruitment:
+    alasan: >
+      Sourcing, screening, pemeringkatan. Kanal ke kandidat adalah WhatsApp
+      Cloud API lewat tool ALTA, bukan gateway Hermes — jadi tidak ada platform.
+    toolsets: [mcp-alta, memory, todo, session_search]
+
+  verifying_readiness:
+    alasan: >
+      Memverifikasi KEASLIAN dokumen, jadi butuh vision untuk membaca pindaian
+      KTP/paspor/ijazah. Berkasnya dibaca dari MinIO di VPS yang sama; vision
+      memakai model ber-PII (Claude), bukan model murah.
+    toolsets: [mcp-alta, memory, todo, session_search, vision]
+
+  customer_service:
+    alasan: >
+      Aftercare pekerja aktif. Semua kontak lewat tool ALTA (welfare_checkins,
+      support_tickets) supaya tiap interaksi tercatat.
+    toolsets: [mcp-alta, memory, todo, session_search]
+
+  sales:
+    alasan: >
+      Top-of-funnel: riset lead dan bahan outreach butuh pencarian web.
+      Relasi & closing klien dipegang founder, jadi tidak ada kanal langsung.
+    toolsets: [mcp-alta, memory, todo, session_search, web]
+
+  legal:
+    alasan: >
+      Telaah kontrak dari pindaian (vision) dan pemeriksaan rujukan hukum
+      (web). Volume rendah, bobot tinggi — modelnya paling mahal.
+    toolsets: [mcp-alta, memory, todo, session_search, vision, web]
+
+  finance:
+    alasan: >
+      Invoice, piutang, bagi hasil. Buku besar tetap di Mekari Jurnal;
+      integrasinya nanti lewat tool, bukan lewat shell.
+    toolsets: [mcp-alta, memory, todo, session_search]
+
+  marketing:
+    alasan: >
+      Riset kata kunci & konten (web), dan gambar untuk job news
+      (image_gen). Tidak pernah menyentuh tabel kandidat — modelnya MiniMax.
+    toolsets: [mcp-alta, memory, todo, session_search, web, image_gen]
+
+  it:
+    alasan: >
+      Satu-satunya departemen dengan terminal dan file — ia memang mengurus
+      layanan dan repo. Konsekuensinya diawasi ketat: setiap perintah shell
+      lewat hook pre_tool_call di guardrails/hooks/.
+    toolsets: [mcp-alta, memory, todo, session_search, terminal, file, web]

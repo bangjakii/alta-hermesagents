@@ -1,0 +1,99 @@
+# =====================================================================
+# Desired state model & profile tiap departemen  ->  tabel `agents`
+# =====================================================================
+# `alta-hermes sync` mendorong isi berkas ini ke kolom profile_name,
+# provider, model, dan subagent_model di tabel agents. Sesudah itu founder
+# boleh menyetelnya dari Admin Panel tanpa deploy — DB yang menang, dan
+# `alta-hermes render` membaca dari DB.
+#
+# Pembagian provider mengikuti PII, bukan harga semata: departemen yang
+# membaca data kandidat memakai Claude; sisanya MiniMax. Jangan menukar
+# sales/marketing/it ke atas atau recruitment/V&R/CS ke bawah tanpa
+# memikirkan ulang ke mana teks CV dan hasil medical dikirim.
+#
+# subagent_model adalah tuas biaya: otak departemen boleh mahal, pekerjaan
+# kasar yang didelegasikan tidak perlu. Legal pengecualian — telaah kontrak
+# yang salah lebih mahal daripada tokennya.
+#
+# !! VERIFIKASI SEBELUM BOOT PERTAMA: nama model di bawah harus cocok dengan
+# katalog provider yang aktif. Jalankan `hermes -p <profile> model` (atau
+# `alta-hermes doctor`) dan sesuaikan bila katalognya sudah bergeser.
+# =====================================================================
+
+orchestrator:
+  profile_name: alta-orchestrator
+  provider: anthropic
+  model: claude-sonnet-5
+  subagent_model: claude-haiku-4-5-20251001
+  catatan: >
+    Satu-satunya yang bicara dengan founder, jadi kualitas penilaiannya
+    menentukan seluruh sisanya. Subagent-nya hanya membaca view pemantauan —
+    model murah memadai.
+
+recruitment:
+  profile_name: alta-recruitment
+  provider: anthropic
+  model: claude-sonnet-5
+  subagent_model: claude-haiku-4-5-20251001
+  catatan: Membaca CV dan jawaban screening. PII penuh.
+
+verifying_readiness:
+  profile_name: alta-vr
+  provider: anthropic
+  model: claude-sonnet-5
+  subagent_model: claude-haiku-4-5-20251001
+  catatan: >
+    Membaca pindaian KTP/paspor lewat vision. PII paling sensitif di seluruh
+    sistem — tidak pernah ke provider non-PII.
+
+customer_service:
+  profile_name: alta-cs
+  provider: anthropic
+  model: claude-sonnet-5
+  subagent_model: claude-haiku-4-5-20251001
+  catatan: >
+    Bicara dengan TKI yang sedang di luar negeri. Salah nada di sini bukan
+    sekadar canggung — orangnya sedang jauh dari rumah.
+
+legal:
+  profile_name: alta-legal
+  provider: anthropic
+  model: claude-opus-5
+  subagent_model: claude-opus-5
+  catatan: >
+    Volume rendah, bobot tinggi. Satu-satunya departemen yang subagent-nya
+    ikut memakai model teratas.
+
+finance:
+  profile_name: alta-finance
+  provider: anthropic
+  model: claude-sonnet-5
+  subagent_model: claude-haiku-4-5-20251001
+  catatan: >
+    Angka uang dan bagi hasil mitra. Tidak membaca tabel kandidat, tapi salah
+    hitung di sini merusak kepercayaan mitra — tetap di Claude.
+
+sales:
+  profile_name: alta-sales
+  provider: openrouter
+  model: minimax/minimax-m2
+  subagent_model: minimax/minimax-m2
+  catatan: >
+    Top-of-funnel, tidak menyentuh tabel kandidat. Lewat OpenRouter, bukan
+    api.minimax.io langsung, supaya trafiknya tidak dihosting di RRT.
+
+marketing:
+  profile_name: alta-marketing
+  provider: openrouter
+  model: minimax/minimax-m2
+  subagent_model: minimax/minimax-m2
+  catatan: Konten & SEO. Tidak pernah menyentuh data kandidat.
+
+it:
+  profile_name: alta-it
+  provider: openrouter
+  model: minimax/minimax-m2
+  subagent_model: minimax/minimax-m2
+  catatan: >
+    Registri layanan dan repo. Satu-satunya yang punya terminal, jadi
+    perintahnya disaring hook guard_terminal.py.
