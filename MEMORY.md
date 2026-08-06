@@ -43,14 +43,22 @@ berbahaya daripada tidak ada memori, karena ia tetap dipercaya.
 - **Founder memegang relasi klien.** Sales hanya top-of-funnel sampai
   `hand_client_to_founder`.
 
-## Keadaan mesin pengembangan (Windows)
+## Keadaan mesin pengembangan (Windows, diperiksa 6 Agustus 2026)
 
-Tidak ada Postgres, Docker, maupun Hermes yang terpasang. Karena itu:
+**Hermes terpasang** di `%LOCALAPPDATA%\hermes` dan sudah menaungi tujuh profile
+KS (`ks-finance`, `ks-hr`, `ks-it`, `ks-legal`, `ks-marketing`, `ks-ops`,
+`ks-sales`). Profile ALTA menumpang instalasi yang sama — satu instalasi Hermes
+memang dirancang menaungi banyak profile, dan tiap profile punya `.env`,
+memori, sesi, serta kredensial sendiri.
+
+**PostgreSQL, Docker, dan WSL tidak ada** di mesin ini. Karena itu:
 
 - Jalur `--from files` bisa diuji penuh; **jalur database belum pernah
-  dijalankan sungguhan** — `sync` dan `render --from database` baru terbukti di
-  VPS.
+  dijalankan sungguhan** — `sync` dan `render --from database` baru terbukti
+  setelah ada Postgres (di VPS, atau dipasang lokal).
 - `pgvector` juga belum terverifikasi di sini (tidak ada binary Windows resmi).
+- `HERMES_PROFILES_ROOT` untuk percobaan lokal adalah
+  `%LOCALAPPDATA%\hermes\profiles`, bukan `~/.hermes/profiles`.
 
 ## Yang belum ada, dan menahan jalur kritis
 

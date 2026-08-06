@@ -6,10 +6,15 @@ arsitekturnya; berkas ini memuat hal yang perlu diketahui **sebelum menyunting**
 ## Ruang lingkup
 
 Hanya **ALTA** (PT Alta Teknologi Indonesia). KS / Krakatau Shipyard adalah
-perusahaan lain di grup yang sama dengan repo sendiri — jangan menyalin pola
-dari sana tanpa memeriksa apakah ia masih benar untuk ALTA. Keduanya memakai
-Hermes, tetapi model wewenangnya berbeda: KS memakai satu agent dengan banyak
-skill; ALTA memakai sembilan profile terpisah, dan alasannya ada di README.
+perusahaan lain di grup yang sama dengan repo, database, dan armada Hermes
+sendiri — jangan menyalin pola dari sana tanpa memeriksa apakah ia masih benar
+untuk ALTA.
+
+Keduanya berbagi **satu instalasi Hermes** di mesin ini
+(`%LOCALAPPDATA%\hermes`), tetapi profile-nya terpisah: `ks-*` milik KS,
+`alta-*` milik ALTA. Satu instalasi memang dirancang menaungi banyak profile,
+dan tiap profile punya `.env`, memori, sesi, serta kredensial sendiri. Jangan
+menyentuh profile `ks-*` dari sini.
 
 ## Tiga repo, tiga tanggung jawab
 
@@ -50,14 +55,26 @@ PYTHONPATH=src python -m alta_hermes.cli doctor
 PYTHONPATH=src python -m alta_hermes.cli render --from files --dry-run
 ```
 
-Mesin pengembangan Windows ini **tidak punya Postgres, Docker, maupun Hermes**.
+Keadaan mesin pengembangan Windows ini (diperiksa 6 Agustus 2026):
+
+| | |
+|---|---|
+| Hermes | **ada** — `%LOCALAPPDATA%\hermes`, 7 profile `ks-*` sudah jalan |
+| `uv` | **ada** — `%LOCALAPPDATA%\hermes\bin\uv.exe` |
+| PostgreSQL | **tidak ada** — tidak ada `psql`, layanan, maupun port 5432 |
+| Docker / WSL | **tidak ada** |
+
 Artinya:
 
-- Jalur `--from files` bisa diuji sepenuhnya; jalur database tidak.
+- Jalur `--from files` bisa diuji sepenuhnya; **jalur database tidak**, karena
+  tidak ada Postgres untuk disambungi.
 - Jangan menulis kode yang mengandaikan bisa dicoba ke DB di sini — tulis
   supaya bisa diperiksa statis, lalu tandai jelas apa yang belum terbukti.
 - Jalur berkas dirender dengan `as_posix()`: render boleh berjalan di Windows,
-  tetapi yang membaca hasilnya selalu Linux.
+  tetapi yang membaca hasilnya selalu Linux di VPS.
+- Untuk mencoba di laptop, setel `HERMES_PROFILES_ROOT` ke
+  `%LOCALAPPDATA%\hermes\profiles` — bukan `~/.hermes/profiles`, karena
+  instalasi di sini memakai `HERMES_HOME` sendiri.
 
 ## Menambah atau mengubah arahan departemen
 

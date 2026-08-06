@@ -65,6 +65,25 @@ sudah ada, bukan melawannya.
 Konsekuensinya: sembilan `HERMES_HOME` terpisah, masing-masing dengan `.env`,
 memori, sesi, dan skill sendiri.
 
+### Berbagi instalasi Hermes dengan armada KS
+
+Satu instalasi Hermes menaungi banyak profile, jadi profile `alta-*` bisa hidup
+berdampingan dengan `ks-*` di mesin yang sama. Yang **terpisah** per profile:
+`config.yaml`, `.env` dan seluruh kredensial, memori, sesi, skill, cron, dan
+state gateway. Hermes bahkan menolak start bila dua profile memakai token bot
+yang sama.
+
+Yang **tidak** terpisah: kode Hermes itu sendiri, dan — ini yang menentukan —
+akun sistem operasi. Profile bukan sandbox: agent yang punya toolset `terminal`
+memakai hak akses pengguna OS yang sama, sehingga ia bisa membaca berkas milik
+profile lain. Di ALTA hanya IT yang punya `terminal`, dan perintahnya disaring
+hook, tetapi pemisahan sesungguhnya antara data ALTA dan armada KS tetap
+**pemisahan mesin**: produksi ALTA jalan di VPS-nya sendiri, dengan Postgres
+dan MinIO yang tidak pernah menyentuh mesin lain.
+
+Instalasi lokal karena itu berguna untuk mengembangkan dan memeriksa hasil
+render, bukan untuk menjalankan operasional.
+
 ---
 
 ## Bagaimana Pekerjaan Mengalir Antar Departemen
