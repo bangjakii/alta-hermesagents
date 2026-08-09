@@ -236,6 +236,26 @@ def _sh(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 
 
+def deliver_target(deliver_to: str | None) -> str | None:
+    """Terjemahkan kosakata ALTA menjadi target pengiriman yang dikenal Hermes.
+
+    `telegram:founder` adalah cara ALTA menyebutnya di database — terbaca founder,
+    dan tidak menaruh chat id siapa pun di sana. Hermes tidak mengenalnya: ia
+    hanya menerima `telegram` (memakai TELEGRAM_HOME_CHANNEL) atau
+    `telegram:<chat_id>`. Jadi chat id founder tinggal di `.env` profile
+    orchestrator sebagai TELEGRAM_HOME_CHANNEL, bukan di database.
+
+    `none` menjadi `local`: hasilnya tersimpan sebagai berkas di
+    `<profile>/cron/output/`. Tanpa ini Hermes memakai default `origin`, dan job
+    departemen tidak punya percakapan asal — kegagalan yang tidak kelihatan.
+    """
+    if not deliver_to or deliver_to == "none":
+        return "local"
+    if deliver_to == "telegram:founder":
+        return "telegram"
+    return deliver_to
+
+
 def render_cron(agent: Agent, schedules: list[Schedule]) -> str:
     lines = [
         "#!/usr/bin/env bash",
@@ -265,8 +285,7 @@ def render_cron(agent: Agent, schedules: list[Schedule]) -> str:
         flags = [f"--name {_sh(job.name)}"]
         for skill in job.skills:
             flags.append(f"--skill {_sh(skill)}")
-        if job.deliver_to and job.deliver_to != "none":
-            flags.append(f"--deliver {_sh(job.deliver_to)}")
+        flags.append(f"--deliver {_sh(deliver_target(job.deliver_to))}")
         if job.job_kind == "script":
             flags.append("--no-agent")
             flags.append(f"--script {_sh(job.prompt)}")

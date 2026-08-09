@@ -16,6 +16,7 @@ import yaml
 from alta_hermes.config import Settings
 from alta_hermes.models import Agent
 from alta_hermes.render import (
+    deliver_target,
     dump_config,
     render_config,
     render_cron,
@@ -231,6 +232,22 @@ def test_cron_idempoten_dan_aman_dikutip(state):
     for job in jobs:
         assert f"cron remove '{job.name}'" in script
         assert f"--name '{job.name}'" in script
+
+
+def test_target_pengiriman_diterjemahkan_ke_kosakata_hermes(state):
+    # Hermes tidak mengenal "telegram:founder" — chat id founder ada di
+    # TELEGRAM_HOME_CHANNEL pada .env, bukan di database.
+    assert deliver_target("telegram:founder") == "telegram"
+    # "none" harus jadi "local"; default Hermes adalah "origin", dan job
+    # departemen tidak punya percakapan asal.
+    assert deliver_target("none") == "local"
+    assert deliver_target(None) == "local"
+    assert deliver_target("telegram:-1001234") == "telegram:-1001234"
+
+    briefing = next(s for s in state.schedules_for("orchestrator") if s.name == "briefing-pagi")
+    script = render_cron(state.agents["orchestrator"], [briefing])
+    assert "--deliver 'telegram'" in script
+    assert "telegram:founder" not in script
 
 
 def test_kutipan_tunggal_dalam_prompt_tidak_memecah_skrip():
