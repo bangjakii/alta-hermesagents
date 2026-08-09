@@ -71,6 +71,36 @@ def cmd_sync(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def cmd_secrets(args: argparse.Namespace, settings: Settings) -> int:
+    import os
+
+    from .secrets import distribute
+
+    state = _load_state(settings, args.source)
+    plans = distribute(state, settings, dict(os.environ), dry_run=args.dry_run)
+
+    kurang = 0
+    for plan in plans:
+        tanda = "?" if args.dry_run else "+"
+        # Nama kunci, tidak pernah nilainya.
+        print(f"{tanda} {plan.profile_name:20} {', '.join(plan.keys)}")
+        if plan.missing:
+            kurang += len(plan.missing)
+            print(f"  ! belum terisi di .env repo: {', '.join(plan.missing)}")
+
+    print()
+    if args.dry_run:
+        print(f"[uji coba] {len(plans)} berkas .env akan ditulis — tidak ada yang disentuh")
+    else:
+        print(f"{len(plans)} berkas .env ditulis (mode 600).")
+    if kurang:
+        print(
+            f"{kurang} nilai masih kosong. Isi di {settings.repo_root / '.env'} lalu "
+            "jalankan lagi — profile yang kuncinya kosong tidak akan bisa memanggil model."
+        )
+    return 0
+
+
 def cmd_doctor(args: argparse.Namespace, settings: Settings) -> int:
     problems: list[str] = []
     notes: list[str] = []
@@ -203,6 +233,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="alasan yang tersimpan di audit_log",
     )
     sync.set_defaults(func=cmd_sync)
+
+    rahasia = sub.add_parser(
+        "secrets",
+        help="sebarkan kredensial dari .env repo ke .env tiap profile Hermes",
+    )
+    rahasia.add_argument(
+        "--from", dest="source", choices=("database", "files"), default="files",
+        help="sumber daftar departemen & providernya (default: files)",
+    )
+    rahasia.add_argument("--dry-run", action="store_true", help="tampilkan tanpa menulis")
+    rahasia.set_defaults(func=cmd_secrets)
 
     doctor = sub.add_parser("doctor", help="periksa kesehatan konfigurasi sebelum deploy")
     doctor.set_defaults(func=cmd_doctor)

@@ -30,9 +30,12 @@ Kalau sebuah perubahan menyentuh **tool** atau **skema**, tempatnya di
 
 ## Aturan yang tidak boleh dilanggar saat menyunting
 
-1. **Tidak ada rahasia.** Tidak di `.env` yang di-commit, tidak di
-   `agents.yaml`, tidak di directive, tidak di contoh. Kredensial hidup di
-   Infisical; yang boleh disimpan hanya jalurnya.
+1. **Tidak ada rahasia di berkas ter-commit.** Tidak di `agents.yaml`, tidak di
+   directive, tidak di `.env.example`. Kredensial hidup di Infisical; `.env`
+   repo (gitignored) hanyalah singgahan yang disebarkan `alta-hermes secrets`
+   ke `.env` tiap profile, lalu dihapus. Pembagiannya bukan kenyamanan
+   belaka — profile MiniMax tidak boleh menerima kunci Anthropic, dan token
+   Telegram hanya sampai ke orchestrator. Ada uji untuk keduanya.
 2. **Guardrail tetap di repo.** `guardrails/` sengaja tidak ada di database.
    Memindahkan salah satunya ke `agent_directives` berarti ia bisa berubah
    lewat CRUD Admin Panel — itu justru yang dihindari.

@@ -130,6 +130,7 @@ VPS yang memegang PII TKI. Yang pertama boleh di database; yang kedua tidak.
 
 ```bash
 alta-hermes doctor                    # periksa sebelum menyentuh apa pun
+alta-hermes secrets                   # sebar kredensial .env repo -> .env tiap profile
 alta-hermes sync --dry-run            # selisih repo vs database
 alta-hermes sync --reason "..."       # dorong repo -> database (teraudit)
 alta-hermes render                    # database -> profile Hermes
@@ -170,10 +171,12 @@ scripts/bootstrap_vps.sh
 
 Sesudah itu tiga hal masih dikerjakan manusia, dan memang harus:
 
-1. **Kredensial** — dari Infisical ke `~/.hermes/profiles/<profile>/.env`.
-   Minimal `ALTA_DATABASE_URL` di setiap profile, kunci provider LLM, serta
-   `TELEGRAM_BOT_TOKEN` + `TELEGRAM_FOUNDER_CHAT_ID` **hanya** di orchestrator.
-   Tidak ada satu pun rahasia yang boleh masuk repo ini atau database.
+1. **Kredensial.** Isi bagian kredensial di `.env` repo (dari `infisical
+   export`), jalankan `alta-hermes secrets`, lalu **hapus `.env`-nya**. Perintah
+   itu menulis `.env` tiap profile (mode 600) dan membagi kunci menurut hak
+   masing-masing: profile MiniMax tidak pernah menerima kunci Anthropic, dan
+   token Telegram hanya sampai ke orchestrator. Tidak ada rahasia yang masuk
+   berkas ter-commit maupun database.
 2. **Verifikasi nama model** — nilai di `agents.yaml` belum diperiksa terhadap
    katalog provider yang aktif. Jalankan `hermes -p <profile> model`.
 3. **`max_connections`** — bawaan Postgres 100, sementara 9 MCP × `ALTA_POOL_MAX`
@@ -262,5 +265,6 @@ Belum dibangun:
 - **Pemantauan armada** — belum ada yang memberi tahu founder kalau sebuah
   profile berhenti mengerjakan antreannya. Sementara ini terlihat lewat
   penumpukan di `operational_dashboard`, yaitu setelah terlambat.
-- **Rotasi kredensial otomatis** dari Infisical ke `.env` tiap profile;
-  sekarang masih disalin manusia.
+- **Tarikan langsung dari Infisical.** `alta-hermes secrets` sudah menyebarkan
+  kredensial ke tiap profile, tetapi sumbernya masih `.env` repo yang diisi
+  tangan; belum ada `infisical export` otomatis maupun rotasi berkala.
