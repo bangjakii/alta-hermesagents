@@ -37,9 +37,13 @@ agents:
       mengerjakan pekerjaan departemen, ia mendistribusikannya lewat tasks.
     toolsets: [mcp-alta, memory, todo, session_search, cronjob, delegation]
     platforms: [telegram]
-    # Perannya memantau, bukan memutuskan kandidat. Tanpa ini batas antar
-    # departemen luntur karena orkestrator bisa mengerjakan semuanya sendiri.
-    read_only: true
+    # read_only DICABUT (migration 060). Batas wewenangnya kini hidup di
+    # agent_tool_permissions: 8 tool koordinasi boleh menulis, 81 sisanya
+    # dicabut. Sakelar runtime tadinya menolak tool yang justru sudah
+    # diizinkan — termasuk record_escalation_decision, sehingga keputusan
+    # founder tidak punya jalan masuk sama sekali. Daftar perkakas harus
+    # jujur: yang terlihat harus bisa dipanggil.
+    read_only: false
 
   recruitment:
     alasan: >

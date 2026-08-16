@@ -141,10 +141,10 @@ def test_perintah_paksa_membawa_departemen_lewat_env(state, policies, settings):
     orch = render_config({}, state.agents["orchestrator"], policies["orchestrator"], dipaksa)
     rec = render_config({}, state.agents["recruitment"], policies["recruitment"], dipaksa)
 
+    # Orkestrator pun tidak lagi membawa ALTA_READ_ONLY (migration 060).
     assert orch["mcp_servers"]["alta"]["env"] == {
         "ALTA_AGENT": "orchestrator",
         "ALTA_DATABASE_URL": "${ALTA_DATABASE_URL}",
-        "ALTA_READ_ONLY": "true",
     }
     assert rec["mcp_servers"]["alta"]["env"] == {
         "ALTA_AGENT": "recruitment",
@@ -173,11 +173,14 @@ def test_peluncur_membaca_env_profile_dan_menyetel_departemen(state, policies, s
     assert "ALTA_POOL_MAX" in script
 
 
-def test_peluncur_orchestrator_baca_saja(state, policies, settings):
-    script = render_mcp_launcher(
-        state.agents["orchestrator"], policies["orchestrator"], settings
-    )
-    assert "export ALTA_READ_ONLY=true" in script
+def test_tidak_ada_profile_yang_dijalankan_baca_saja(state, policies, settings):
+    # ALTA_READ_ONLY dicabut di migration 060. Sakelar itu menolak tool yang
+    # sudah diizinkan database — termasuk record_escalation_decision, sehingga
+    # keputusan founder tidak punya jalan masuk. Batasnya kini sepenuhnya di
+    # agent_tool_permissions, dan daftar perkakas jadi jujur lagi.
+    for code, agent in state.agents.items():
+        script = render_mcp_launcher(agent, policies[code], settings)
+        assert "ALTA_READ_ONLY" not in script, f"{code} masih dipaksa baca saja"
 
 
 def test_perintah_mcp_bawaan_bukan_uv_run(settings):
