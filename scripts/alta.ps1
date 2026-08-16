@@ -81,4 +81,16 @@ if ($secrets) {
     }
 }
 
-& $hermes -p $profileName @HermesArgs
+# Jalankan dari workspace profile, bukan dari repo. Hermes menempelkan
+# CLAUDE.md/AGENTS.md milik cwd ke system prompt (agent/prompt_builder.py),
+# dan CLAUDE.md repo ini ditujukan untuk Claude Code yang MENGGARAP repo --
+# terbaca dari dalam, orchestrator menyangka tugasnya mengaudit directive.
+$workspace = Join-Path $env:HERMES_PROFILES_ROOT (Join-Path $profileName 'workspace')
+if (-not (Test-Path $workspace)) { New-Item -ItemType Directory -Path $workspace -Force | Out-Null }
+
+Push-Location $workspace
+try {
+    & $hermes -p $profileName @HermesArgs
+} finally {
+    Pop-Location
+}
