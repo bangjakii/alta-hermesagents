@@ -20,6 +20,16 @@
 # semuanya). Hanya laporan yang memang untuk founder memakai
 # 'telegram:founder', dan itu hanya boleh dipakai orchestrator —
 # `alta-hermes doctor` menolak bila departemen lain memakainya.
+#
+# ---------------------------------------------------------------------
+# SETELAN UJI — `ambil-task` dan `sapu-bottleneck` disetel "* * * * *"
+# (tiap menit) supaya putaran kerja terlihat langsung saat pengembangan.
+# TURUNKAN SEBELUM VPS. Tiap denyut memanggil model: sembilan job tiap
+# menit = ~13.000 panggilan sehari, dan sebagian besar hanya menemukan
+# antrean kosong. Nilai semula: ambil-task 15 menit (recruitment, V&R,
+# CS), 30 menit (sales, legal, finance), 2 jam (marketing, IT);
+# sapu-bottleneck "0 10,14,17 * * *".
+# ---------------------------------------------------------------------
 # =====================================================================
 
 orchestrator:
@@ -35,7 +45,7 @@ orchestrator:
       founder, jawab persis [SILENT].
 
   - name: sapu-bottleneck
-    schedule: "0 10,14,17 * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan operational_dashboard. Untuk tiap penumpukan yang jelas
@@ -56,7 +66,7 @@ orchestrator:
 
 recruitment:
   - name: ambil-task
-    schedule: "*/15 * * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks. Kerjakan dari prioritas tertinggi: start_task
@@ -88,7 +98,7 @@ recruitment:
 
 verifying_readiness:
   - name: ambil-task
-    schedule: "*/15 * * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks dan kerjakan sesuai prioritas, dengan start_task
@@ -116,7 +126,7 @@ verifying_readiness:
 
 customer_service:
   - name: ambil-task
-    schedule: "*/15 * * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
@@ -145,7 +155,7 @@ customer_service:
 
 sales:
   - name: ambil-task
-    schedule: "*/15 * * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
@@ -165,7 +175,7 @@ sales:
 
 legal:
   - name: ambil-task
-    schedule: "*/30 * * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks. Task bertipe legal_review ditutup dengan vonis
@@ -185,7 +195,7 @@ legal:
 
 finance:
   - name: ambil-task
-    schedule: "*/30 * * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
@@ -213,7 +223,7 @@ finance:
 
 marketing:
   - name: ambil-task
-    schedule: "0 */2 * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
@@ -231,7 +241,7 @@ marketing:
 
 it:
   - name: ambil-task
-    schedule: "0 */2 * * *"
+    schedule: "* * * * *"
     deliver_to: none
     prompt: >
       Jalankan list_my_tasks dan kerjakan, dengan start_task dan complete_task
