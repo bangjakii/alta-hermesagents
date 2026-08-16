@@ -1,17 +1,21 @@
 # =====================================================================
 # Menjalankan Hermes untuk satu departemen ALTA - uji lokal di Windows.
 # =====================================================================
-# Kunci cukup ada di SATU tempat: .env di akar repo ini. Skrip ini memuatnya
-# ke lingkungan proses, lalu memanggil hermes. Tidak ada salinan kunci yang
-# berserak di .env tiap profile.
+# Yang Anda sunting cukup SATU berkas: .env di akar repo ini.
 #
 #   .\scripts\alta.ps1 orchestrator chat        # buka CLI
 #   .\scripts\alta.ps1 orchestrator doctor
 #   .\scripts\alta.ps1 it mcp test alta
 #
+# Kenapa skrip ini menyalin kunci ke .env tiap profile, bukan sekadar
+# meng-export ke lingkungan proses: hermes_cli/env_loader.py memuat .env
+# milik HERMES_HOME dengan override=True, justru supaya menang atas
+# variabel shell yang basi. Jadi apa pun yang di-export di sini akan
+# ditimpa .env profile. Satu-satunya cara "satu berkas" tetap berlaku
+# adalah menjadikan .env repo sumber, lalu menyebarkannya tiap kali.
+#
 # Di VPS pola ini TIDAK dipakai: gateway berjalan sebagai layanan tanpa
-# shell, jadi di sana kredensial memang harus ada di .env tiap profile
-# (lihat `alta-hermes secrets`).
+# shell, dan `alta-hermes secrets` dijalankan sekali saat deploy.
 #
 # Berkas ini sengaja ASCII saja: PowerShell 5.1 membaca .ps1 sebagai ANSI,
 # dan karakter non-ASCII tanpa BOM membuatnya gagal di-parse.
@@ -65,5 +69,16 @@ if (-not (Test-Path $hermes)) {
 }
 
 if (-not $HermesArgs) { $HermesArgs = @('chat') }
+
+# Sebarkan kunci dari .env repo ke .env profile. Diam bila berhasil; kalau
+# gagal cuma diperingatkan, sebab profile bisa saja sudah punya kunci yang sah.
+$secrets = (Get-Command alta-hermes -ErrorAction SilentlyContinue).Source
+if ($secrets) {
+    $out = & $secrets secrets 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "penyebaran kunci gagal; memakai .env profile yang ada"
+        $out | ForEach-Object { Write-Warning $_ }
+    }
+}
 
 & $hermes -p $profileName @HermesArgs
