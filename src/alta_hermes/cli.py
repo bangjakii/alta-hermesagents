@@ -77,10 +77,21 @@ def cmd_secrets(args: argparse.Namespace, settings: Settings) -> int:
     from .secrets import distribute
 
     state = _load_state(settings, args.source)
-    plans = distribute(state, settings, dict(os.environ), dry_run=args.dry_run)
+    plans = distribute(
+        state,
+        settings,
+        dict(os.environ),
+        dry_run=args.dry_run,
+        include_missing=args.include_missing,
+    )
 
     kurang = 0
+    dilewati = 0
     for plan in plans:
+        if plan.profile_missing and not args.include_missing:
+            dilewati += 1
+            print(f"- {plan.profile_name:20} dilewati — profile Hermes-nya belum dibuat")
+            continue
         tanda = "?" if args.dry_run else "+"
         # Nama kunci, tidak pernah nilainya.
         print(f"{tanda} {plan.profile_name:20} {', '.join(plan.keys)}")
@@ -88,11 +99,17 @@ def cmd_secrets(args: argparse.Namespace, settings: Settings) -> int:
             kurang += len(plan.missing)
             print(f"  ! belum terisi di .env repo: {', '.join(plan.missing)}")
 
+    ditulis = len(plans) - dilewati
     print()
     if args.dry_run:
-        print(f"[uji coba] {len(plans)} berkas .env akan ditulis — tidak ada yang disentuh")
+        print(f"[uji coba] {ditulis} berkas .env akan ditulis — tidak ada yang disentuh")
     else:
-        print(f"{len(plans)} berkas .env ditulis (mode 600).")
+        print(f"{ditulis} berkas .env ditulis (mode 600).")
+    if dilewati:
+        print(
+            f"{dilewati} profile dilewati karena belum ada. Buat dengan "
+            "`hermes profile create <nama>` lalu jalankan lagi."
+        )
     if kurang:
         print(
             f"{kurang} nilai masih kosong. Isi di {settings.repo_root / '.env'} lalu "
@@ -243,6 +260,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="sumber daftar departemen & providernya (default: files)",
     )
     rahasia.add_argument("--dry-run", action="store_true", help="tampilkan tanpa menulis")
+    rahasia.add_argument(
+        "--include-missing", action="store_true",
+        help="tulis juga untuk profile Hermes yang belum dibuat",
+    )
     rahasia.set_defaults(func=cmd_secrets)
 
     doctor = sub.add_parser("doctor", help="periksa kesehatan konfigurasi sebelum deploy")

@@ -56,6 +56,10 @@ class SecretPlan:
     keys: tuple[str, ...]
     missing: tuple[str, ...]
     content: str
+    # Profile-nya belum dibuat di Hermes. Menulis .env ke direktori kosong akan
+    # melahirkan profile setengah jadi yang tetap muncul di `hermes profile
+    # list` tanpa config maupun skill — jadi dilewati, bukan dibuat diam-diam.
+    profile_missing: bool = False
 
 
 def keys_for(agent: Agent) -> tuple[str, ...]:
@@ -97,16 +101,24 @@ def plan_for(agent: Agent, settings: Settings, source: dict[str, str]) -> Secret
         keys=wanted,
         missing=tuple(missing),
         content="\n".join(lines).rstrip() + "\n",
+        profile_missing=not path.parent.is_dir(),
     )
 
 
 def distribute(
-    state: DesiredState, settings: Settings, source: dict[str, str], *, dry_run: bool
+    state: DesiredState,
+    settings: Settings,
+    source: dict[str, str],
+    *,
+    dry_run: bool,
+    include_missing: bool = False,
 ) -> list[SecretPlan]:
     plans = [plan_for(agent, settings, source) for agent in state.agents.values()]
     if dry_run:
         return plans
     for plan in plans:
+        if plan.profile_missing and not include_missing:
+            continue
         plan.path.parent.mkdir(parents=True, exist_ok=True)
         plan.path.write_text(plan.content, encoding="utf-8", newline="\n")
         try:

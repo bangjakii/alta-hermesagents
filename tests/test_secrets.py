@@ -93,8 +93,19 @@ def test_uji_coba_tidak_menyentuh_berkas(state, settings):
     assert not list(settings.profiles_root.glob("*/.env"))
 
 
-def test_penulisan_nyata_menghasilkan_satu_berkas_per_profile(state, settings):
-    plans = distribute(state, settings, SUMBER, dry_run=False)
+def test_profile_yang_belum_dibuat_dilewati(state, settings):
+    # Menulis .env ke direktori kosong melahirkan profile setengah jadi yang
+    # tetap muncul di `hermes profile list` tanpa config maupun skill.
+    settings.profile_dir("alta-orchestrator").mkdir(parents=True)
+
+    distribute(state, settings, SUMBER, dry_run=False)
+
+    ditulis = {p.parent.name for p in settings.profiles_root.glob("*/.env")}
+    assert ditulis == {"alta-orchestrator"}
+
+
+def test_include_missing_menulis_untuk_semua(state, settings):
+    plans = distribute(state, settings, SUMBER, dry_run=False, include_missing=True)
     assert len(plans) == 9
     for plan in plans:
         assert plan.path.is_file()
