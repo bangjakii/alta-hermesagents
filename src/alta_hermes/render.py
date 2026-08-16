@@ -132,6 +132,18 @@ def render_config(
     # terpasang dan guardrail-nya hilang tanpa ada yang tahu.
     config["hooks_auto_accept"] = True
 
+    # Cache prompt 1 jam, bukan bawaan 5 menit.
+    #
+    # Bagian yang tidak berubah antar denyut cron besar sekali: SOUL.md,
+    # panduan Hermes, dan skema tool — sekitar 77 KB (~20.000 token) sebelum
+    # agent mengerjakan apa pun. Dengan TTL 5 menit, jadwal yang lebih jarang
+    # dari itu SELALU meleset dan tiap denyut membayar penuh.
+    #
+    # Tulis cache 1 jam berongkos 2x sekali, bacanya 0,1x. Untuk pekerja cron
+    # yang bangun berkala dengan konteks yang sama persis, itu selisih besar —
+    # dan makin jarang jadwalnya, makin besar bedanya.
+    config["prompt_caching"] = {"cache_ttl": "1h"}
+
     return config
 
 
