@@ -189,8 +189,23 @@ def test_perintah_mcp_bawaan_bukan_uv_run(settings):
 
 def test_toolset_dipersempit_ke_daftar_departemen(state, policies, settings):
     config = render_config({}, state.agents["marketing"], policies["marketing"], settings)
-    assert config["toolsets"] == ["alta-marketing"]
-    assert "terminal" not in config["custom_toolsets"]["alta-marketing"]
+    assert "terminal" not in config["platform_toolsets"]["cli"]
+    assert "mcp-alta" in config["platform_toolsets"]["cli"]
+    # custom_toolsets ada di dokumentasi Hermes tetapi tidak diimplementasikan
+    # di 0.17.0; menuliskannya membuat toolset diam-diam jatuh ke bawaan.
+    assert "custom_toolsets" not in config
+
+
+def test_toolset_ditulis_per_platform(state, policies, settings):
+    # Jalur CLI/gateway membaca platform_toolsets, bukan `toolsets` di akar.
+    # Tanpa kunci ini agent tetap hidup tetapi kehilangan seluruh tool ALTA.
+    orch = render_config({}, state.agents["orchestrator"], policies["orchestrator"], settings)
+    assert set(orch["platform_toolsets"]) == {"cli", "telegram"}
+
+    cs = render_config(
+        {}, state.agents["customer_service"], policies["customer_service"], settings
+    )
+    assert set(cs["platform_toolsets"]) == {"cli"}
 
 
 def test_hanya_it_yang_mendapat_penyaring_terminal(state, policies, settings):
@@ -219,7 +234,7 @@ def test_jalur_selalu_bergaya_posix_dan_dikutip(state, policies, settings):
 
 def test_config_yang_dirender_tetap_yaml_sah(state, policies, settings):
     text = dump_config(render_config({}, state.agents["it"], policies["it"], settings))
-    assert yaml.safe_load(text)["toolsets"] == ["alta-it"]
+    assert yaml.safe_load(text)["platform_toolsets"]["cli"] == policies["it"]["toolsets"]
 
 
 # ------------------------------------------------------------------ cron.sh

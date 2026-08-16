@@ -108,10 +108,20 @@ def render_config(
     servers["alta"] = _mcp_entry(agent, policy, settings)
     config["mcp_servers"] = servers
 
-    config["toolsets"] = [toolset_name]
-    custom = dict(config.get("custom_toolsets") or {})
-    custom[toolset_name] = list(policy["toolsets"])
-    config["custom_toolsets"] = custom
+    # Toolset diatur lewat `platform_toolsets`, per platform. Dua jalan yang
+    # tampak benar tetapi diam-diam gagal, dan kegagalannya tak berbunyi —
+    # agent tetap hidup, hanya kehilangan seluruh tool ALTA:
+    #   * `custom_toolsets` ada di dokumentasi tetapi tidak diimplementasikan
+    #     di Hermes 0.17.0;
+    #   * `toolsets` di akar tidak dibaca jalur CLI/gateway, yang memanggil
+    #     _get_platform_tools(cfg, platform) dan hanya melihat platform_toolsets.
+    names = list(policy["toolsets"])
+    config["toolsets"] = names
+    platform_toolsets = dict(config.get("platform_toolsets") or {})
+    for platform in ["cli", *policy["platforms"]]:
+        platform_toolsets[platform] = names
+    config["platform_toolsets"] = platform_toolsets
+    config.pop("custom_toolsets", None)
 
     agent_cfg = dict(config.get("agent") or {})
     agent_cfg["disabled_toolsets"] = list(policy["disabled_toolsets"])
